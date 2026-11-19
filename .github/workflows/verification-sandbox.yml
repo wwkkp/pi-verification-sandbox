@@ -1,0 +1,51 @@
+name: Verification sandbox
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the named candidate behavior
+        run: grep -Fxq 'pi-verification-sandbox: accepted-v1' site/probe.txt
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: candidate-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Package the exact merge revision
+        run: |
+          mkdir -p site/evidence
+          cp site/probe.txt "site/evidence/$GITHUB_SHA.txt"
+          printf '%s\n' "$GITHUB_SHA" > site/revision.txt
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - name: Deploy to the sandbox Pages site
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Check published behavior on this revision
+        env:
+          TEST_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors "${TEST_URL%/}/evidence/$GITHUB_SHA.txt" | grep -Fxq 'pi-verification-sandbox: accepted-v1'
+          test "$(curl --fail --silent --show-error "${TEST_URL%/}/revision.txt?revision=$GITHUB_SHA")" = "$GITHUB_SHA"
