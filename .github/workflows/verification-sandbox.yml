@@ -16,7 +16,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify the named candidate behavior
-        run: grep -Fxq 'pi-verification-sandbox: accepted-v1' site/probe.txt
+        run: |
+          grep -Fxq 'pi-verification-sandbox: accepted-v1' site/probe.txt
 
   deploy:
     if: github.event_name == 'push'
